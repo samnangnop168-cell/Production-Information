@@ -1,0 +1,2562 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shift Log Entry & Production Downtime Log</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Inter & JetBrains Mono Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+          },
+          colors: {
+            canvas: '#080c14',
+            card: '#0f1724',
+            cardElevated: '#131d2e',
+            field: '#0a101b',
+            borderSubtle: '#1e2b40',
+            borderFocus: '#f59e0b',
+            amberBadgeText: '#f5b027',
+            amberBadgeBg: '#121b2b',
+            saveOrange: '#ea580c',
+            saveOrangeHover: '#f97316',
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    /* Ensure dark native date/time pickers match the industrial dark theme */
+    input[type="date"]::-webkit-calendar-picker-indicator,
+    input[type="time"]::-webkit-calendar-picker-indicator {
+      opacity: 0;
+      position: absolute;
+      right: 0;
+      width: 2.5rem;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    /* Prevent accidental iOS zoom on inputs and keep touch targets generous */
+    input,
+    select,
+    button {
+      touch-action: manipulation;
+    }
+
+    /* Custom subtle scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #080c14;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e2b40;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #2e4161;
+    }
+
+    @keyframes toastSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.98);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    .toast-anim {
+      animation: toastSlideIn 0.2s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="bg-canvas text-slate-100 font-sans antialiased min-h-screen selection:bg-amber-500/30 selection:text-amber-200 overflow-x-hidden">
+  <!-- Ambient subtle grid backdrop -->
+  <div class="fixed inset-0 pointer-events-none opacity-25" style="background-image: radial-gradient(#1e2b40 1px, transparent 1px); background-size: 24px 24px;"></div>
+
+  <div class="relative z-10 w-full max-w-6xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-8 lg:py-10">
+    <!-- Top Utility Bar (adapts cleanly from compact phone stack to tablet/PC row) -->
+    <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 sm:mb-7">
+      <div class="flex items-center gap-2.5">
+        <span class="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]"></span>
+        <span class="text-xs font-semibold tracking-wider uppercase text-slate-400">
+          MES / Shopfloor Logger
+        </span>
+        <span class="hidden md:inline-block text-[11px] font-mono px-2 py-0.5 rounded-md bg-card border border-borderSubtle text-slate-400">
+          Phone &bull; Tablet &bull; PC
+        </span>
+      </div>
+
+      <div class="grid grid-cols-3 sm:flex items-center gap-2 w-full sm:w-auto">
+        <button
+          id="openMasterListsBtn"
+          type="button"
+          class="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2.5 sm:py-2 rounded-xl text-xs font-semibold bg-card border border-borderSubtle text-slate-300 hover:text-amber-300 hover:border-amber-500/50 transition-colors cursor-pointer"
+          title="Register or remove custom Lines and Model Names"
+        >
+          <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          <span class="truncate">Master Lists</span>
+        </button>
+
+        <button
+          id="openScriptModalBtn"
+          type="button"
+          class="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2.5 sm:py-2 rounded-xl text-xs font-semibold bg-card border border-borderSubtle text-slate-300 hover:text-amber-300 hover:border-amber-500/50 transition-colors cursor-pointer"
+          title="View or copy Google Apps Script for Shift & Downtime logging"
+        >
+          <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          </svg>
+          <span class="truncate">Apps Script</span>
+        </button>
+
+        <button
+          id="toggleRecordsBtn"
+          type="button"
+          class="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2.5 sm:py-2 rounded-xl text-xs font-semibold bg-card border border-borderSubtle text-slate-300 hover:text-white hover:border-slate-600 transition-colors cursor-pointer"
+        >
+          <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          <span class="truncate">Records</span>
+          <span id="recordCountBadge" class="px-1.5 py-0.5 text-[11px] font-mono rounded-md bg-slate-800 text-amber-400 border border-slate-700/80">
+            0
+          </span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Grid: Single column on phone, balanced 2-column split on tablet/PC -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 lg:gap-7 items-start">
+      <!-- Primary Shift Log Entry Card -->
+      <section class="lg:col-span-7 xl:col-span-6 w-full" id="entryCardColumn">
+        <form
+          id="shiftLogForm"
+          novalidate
+          class="bg-card border border-borderSubtle rounded-2xl p-4 sm:p-6 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.75)] transition-all"
+        >
+          <!-- Top Header Row: Pill Badge + Save Button -->
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-5 sm:mb-6">
+            <div
+              class="inline-flex items-center px-3.5 py-2 rounded-xl bg-amberBadgeBg border border-borderSubtle/90 select-none"
+            >
+              <span class="font-mono text-xs sm:text-[13px] font-bold tracking-[0.08em] uppercase text-amberBadgeText">
+                SHIFT LOG ENTRY
+              </span>
+            </div>
+
+            <button
+              id="saveRecordBtn"
+              type="submit"
+              class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 sm:py-2 rounded-xl bg-saveOrange hover:bg-saveOrangeHover active:scale-[0.98] text-white text-sm font-bold tracking-tight shadow-[0_6px_20px_-4px_rgba(234,88,12,0.55)] transition-all cursor-pointer"
+            >
+              <span class="text-base leading-none font-bold">+</span>
+              <span>Save Record</span>
+            </button>
+          </div>
+
+          <!-- Form Grid (2 Columns on desktop/tablet, 1 column on narrow screens) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5">
+            <!-- 1. DATE -->
+            <div>
+              <label
+                for="logDate"
+                class="block text-[11px] font-bold tracking-[0.09em] uppercase text-slate-400 mb-2"
+              >
+                DATE
+              </label>
+              <div class="relative flex items-center">
+                <input
+                  id="logDate"
+                  name="date"
+                  type="date"
+                  value="2026-11-22"
+                  class="sr-only"
+                  aria-hidden="true"
+                />
+                <input
+                  id="logDateDisplay"
+                  type="text"
+                  inputmode="numeric"
+                  value="11/22/2026"
+                  placeholder="MM/DD/YYYY"
+                  autocomplete="off"
+                  class="w-full bg-field border border-borderSubtle focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 rounded-xl pl-3.5 pr-10 py-3 font-mono text-sm sm:text-[15px] font-semibold text-slate-100 tabular-nums outline-none transition-all"
+                />
+                <button
+                  id="datePickerTrigger"
+                  type="button"
+                  aria-label="Open calendar picker"
+                  class="absolute right-2.5 p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
+                    <rect x="3" y="4" width="18" height="18" rx="2.5" />
+                    <path stroke-linecap="round" d="M16 2v4M8 2v4M3 10h18" />
+                    <circle cx="8.5" cy="14.5" r="1" fill="currentColor" stroke="none" />
+                    <circle cx="12" cy="14.5" r="1" fill="currentColor" stroke="none" />
+                    <circle cx="15.5" cy="14.5" r="1" fill="currentColor" stroke="none" />
+                  </svg>
+                </button>
+              </div>
+              <p id="dateError" class="hidden mt-1.5 text-xs text-rose-400"></p>
+            </div>
+
+            <!-- 2. LINE -->
+            <div>
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <label
+                  for="logLine"
+                  class="block text-[11px] font-bold tracking-[0.09em] uppercase text-slate-400"
+                >
+                  LINE
+                </label>
+                <button
+                  id="toggleNewLineBtn"
+                  type="button"
+                  class="text-[11px] font-semibold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                >
+                  + New Line
+                </button>
+              </div>
+
+              <!-- Select Existing Line -->
+              <div id="lineSelectWrapper" class="relative flex items-center">
+                <select
+                  id="logLine"
+                  name="line"
+                  class="w-full appearance-none bg-field border border-borderSubtle focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 rounded-xl pl-3.5 pr-10 py-3 text-sm sm:text-[15px] font-semibold text-slate-100 outline-none transition-all cursor-pointer"
+                >
+                  <!-- Populated dynamically from registered lines -->
+                </select>
+                <div class="pointer-events-none absolute right-3 text-slate-300">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+
+              <!-- Register New Line Inline -->
+              <div id="newLineWrapper" class="hidden mt-1 flex items-center gap-1.5">
+                <input
+                  id="newLineInput"
+                  type="text"
+                  placeholder="e.g. Line O or Assembly 2"
+                  autocomplete="off"
+                  class="flex-1 min-w-0 bg-field border border-amber-500/60 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-100 placeholder:text-slate-500 outline-none transition-all"
+                />
+                <button
+                  id="registerNewLineBtn"
+                  type="button"
+                  class="px-3 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shrink-0 transition-colors cursor-pointer"
+                >
+                  Add
+                </button>
+                <button
+                  id="cancelNewLineBtn"
+                  type="button"
+                  class="px-2.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold shrink-0 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+              <p id="lineError" class="hidden mt-1.5 text-xs text-rose-400"></p>
+            </div>
+
+            <!-- 3. TIME START -->
+            <div>
+              <label
+                for="timeStart"
+                class="block text-[11px] font-bold tracking-[0.09em] uppercase text-slate-400 mb-2"
+              >
+                TIME START
+              </label>
+              <div class="relative flex items-center">
+                <input
+                  id="timeStart"
+                  name="timeStart"
+                  type="time"
+                  value="08:00"
+                  class="sr-only"
+                  aria-hidden="true"
+                />
+                <input
+                  id="timeStartDisplay"
+                  type="text"
+                  value="08:00 AM"
+                  placeholder="HH:MM AM/PM"
+                  autocomplete="off"
+                  class="w-full bg-field border border-borderSubtle focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 rounded-xl pl-3.5 pr-10 py-3 font-mono text-sm sm:text-[15px] font-semibold text-slate-100 tabular-nums outline-none transition-all"
+                />
+                <button
+                  id="timeStartTrigger"
+                  type="button"
+                  aria-label="Toggle start time AM/PM or open picker"
+                  title="Click to toggle AM/PM (Shift+Click for native time picker)"
+                  class="absolute right-2.5 p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="9" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 2" />
+                  </svg>
+                </button>
+              </div>
+              <p id="timeStartError" class="hidden mt-1.5 text-xs text-rose-400"></p>
+            </div>
+
+            <!-- 4. TIME END -->
+            <div>
+              <label
+                for="timeEnd"
+                class="block text-[11px] font-bold tracking-[0.09em] uppercase text-slate-400 mb-2"
+              >
+                TIME END
+              </label>
+              <div class="relative flex items-center">
+                <input
+                  id="timeEnd"
+                  name="timeEnd"
+                  type="time"
+                  value="20:00"
+                  class="sr-only"
+                  aria-hidden="true"
+                />
+                <input
+                  id="timeEndDisplay"
+                  type="text"
+                  value="08:00 PM"
+                  placeholder="HH:MM AM/PM"
+                  autocomplete="off"
+                  class="w-full bg-field border border-borderSubtle focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 rounded-xl pl-3.5 pr-10 py-3 font-mono text-sm sm:text-[15px] font-semibold text-slate-100 tabular-nums outline-none transition-all"
+                />
+                <button
+                  id="timeEndTrigger"
+                  type="button"
+                  aria-label="Toggle end time AM/PM or open picker"
+                  title="Click to toggle AM/PM (Shift+Click for native time picker)"
+                  class="absolute right-2.5 p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="9" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 2" />
+                  </svg>
+                </button>
+              </div>
+              <p id="timeEndError" class="hidden mt-1.5 text-xs text-rose-400"></p>
+            </div>
+          </div>
+
+          <!-- Live Calculated Duration Strip -->
+          <div class="mt-4 flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl bg-cardElevated/80 border border-borderSubtle/70">
+            <div class="flex items-center gap-2 text-xs text-slate-400">
+              <svg class="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Calculated Window:</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="durationBadge" class="font-mono text-xs font-bold text-amber-300 tabular-nums">
+                12h 00m
+              </span>
+              <span id="overnightTag" class="hidden text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                Overnight
+              </span>
+            </div>
+          </div>
+
+          <!-- 5. MODEL NAME (Full Width) -->
+          <div class="mt-5">
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <label
+                for="modelName"
+                class="block text-[11px] font-bold tracking-[0.09em] uppercase text-slate-400"
+              >
+                MODEL NAME
+              </label>
+              <div class="flex items-center gap-2">
+                <button
+                  id="toggleRegisterModelBtn"
+                  type="button"
+                  class="text-[11px] font-semibold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                >
+                  + Register Model
+                </button>
+                <span class="text-slate-600">|</span>
+                <span class="text-[11px] text-slate-500">Product / SKU</span>
+              </div>
+            </div>
+
+            <!-- Select or Type Model Name -->
+            <div class="flex flex-col sm:flex-row gap-2">
+              <div class="relative flex-1 min-w-0">
+                <input
+                  id="modelName"
+                  name="modelName"
+                  type="text"
+                  list="modelNameSuggestions"
+                  placeholder="Select or type model (e.g. Triton-CONCH)"
+                  autocomplete="off"
+                  class="w-full bg-field border border-borderSubtle focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 rounded-xl px-3.5 py-3 text-sm sm:text-[15px] text-slate-100 placeholder:text-slate-500 outline-none transition-all"
+                />
+                <datalist id="modelNameSuggestions">
+                  <!-- Populated dynamically from registered models -->
+                </datalist>
+              </div>
+              <select
+                id="modelNameSelect"
+                aria-label="Choose from registered models"
+                class="sm:w-44 bg-field border border-borderSubtle focus:border-amber-500 rounded-xl px-3 py-3 text-xs sm:text-sm font-semibold text-slate-200 outline-none cursor-pointer"
+              >
+                <option value="">-- Preset Model --</option>
+              </select>
+            </div>
+
+            <!-- Inline Register New Model Box -->
+            <div id="newModelWrapper" class="hidden mt-2.5 p-3 rounded-xl bg-cardElevated/90 border border-amber-500/40">
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <input
+                  id="newModelInput"
+                  type="text"
+                  placeholder="Register new model name (e.g. Raptor-X1)"
+                  autocomplete="off"
+                  class="flex-1 min-w-0 bg-field border border-borderSubtle focus:border-amber-500 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 outline-none"
+                />
+                <div class="flex items-center gap-2 shrink-0">
+                  <button
+                    id="registerNewModelBtn"
+                    type="button"
+                    class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Save Model
+                  </button>
+                  <button
+                    id="cancelNewModelBtn"
+                    type="button"
+                    class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+              <p id="modelError" class="hidden mt-1.5 text-xs text-rose-400"></p>
+            </div>
+
+            <!-- Quick-Select Model Name Preset Chips -->
+            <div id="modelPresetChipsContainer" class="mt-2.5 flex flex-wrap gap-1.5" role="group" aria-label="Quick model name presets">
+              <!-- Populated dynamically from registered models -->
+            </div>
+          </div>
+
+          <!-- 6. REASON STOP (Full Width) -->
+          <div class="mt-5">
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <label
+                for="reasonStop"
+                class="block text-[11px] font-bold tracking-[0.09em] uppercase text-slate-400"
+              >
+                REASON STOP
+              </label>
+              <div class="flex items-center gap-2">
+                <button
+                  id="toggleRegisterReasonBtn"
+                  type="button"
+                  class="text-[11px] font-semibold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                >
+                  + Register Reason
+                </button>
+                <span class="text-slate-600">|</span>
+                <span class="text-[11px] text-slate-500">Optional / Downtime</span>
+              </div>
+            </div>
+
+            <input
+              id="reasonStop"
+              name="reasonStop"
+              type="text"
+              list="stopReasonSuggestions"
+              placeholder="e.g. Material Jam / Sensor Maintenance"
+              autocomplete="off"
+              class="w-full bg-field border border-borderSubtle focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 rounded-xl px-3.5 py-3 text-sm sm:text-[15px] text-slate-100 placeholder:text-slate-500 outline-none transition-all"
+            />
+            <datalist id="stopReasonSuggestions">
+              <option value="Material Jam"></option>
+              <option value="Sensor Maintenance"></option>
+              <option value="Changeover"></option>
+              <option value="Calibration"></option>
+              <option value="Power Flicker"></option>
+            </datalist>
+
+            <!-- Inline Register New Stop Reason Box -->
+            <div id="newReasonWrapper" class="hidden mt-2.5 p-3 rounded-xl bg-cardElevated/90 border border-amber-500/40">
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <input
+                  id="newReasonInput"
+                  type="text"
+                  placeholder="Register new stop reason (e.g. Feeder Jam)"
+                  autocomplete="off"
+                  class="flex-1 min-w-0 bg-field border border-borderSubtle focus:border-amber-500 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 outline-none"
+                />
+                <div class="flex items-center gap-2 shrink-0">
+                  <button
+                    id="registerNewReasonBtn"
+                    type="button"
+                    class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Save Reason
+                  </button>
+                  <button
+                    id="cancelNewReasonBtn"
+                    type="button"
+                    class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+              <p id="reasonError" class="hidden mt-1.5 text-xs text-rose-400"></p>
+            </div>
+
+            <!-- Quick-Select Stop Reason Preset Chips -->
+            <div id="reasonPresetChipsContainer" class="mt-2.5 flex flex-wrap gap-1.5" role="group" aria-label="Quick stop reason presets">
+              <button type="button" data-reason-preset="Material Jam" class="reason-preset-chip px-2.5 py-1 rounded-lg text-[11px] font-medium bg-field hover:bg-slate-800 text-slate-300 hover:text-amber-300 border border-borderSubtle/80 transition-colors cursor-pointer">
+                Material Jam
+              </button>
+              <button type="button" data-reason-preset="Sensor Maintenance" class="reason-preset-chip px-2.5 py-1 rounded-lg text-[11px] font-medium bg-field hover:bg-slate-800 text-slate-300 hover:text-amber-300 border border-borderSubtle/80 transition-colors cursor-pointer">
+                Sensor Maintenance
+              </button>
+              <button type="button" data-reason-preset="Changeover" class="reason-preset-chip px-2.5 py-1 rounded-lg text-[11px] font-medium bg-field hover:bg-slate-800 text-slate-300 hover:text-amber-300 border border-borderSubtle/80 transition-colors cursor-pointer">
+                Changeover
+              </button>
+              <button type="button" data-reason-preset="Calibration" class="reason-preset-chip px-2.5 py-1 rounded-lg text-[11px] font-medium bg-field hover:bg-slate-800 text-slate-300 hover:text-amber-300 border border-borderSubtle/80 transition-colors cursor-pointer">
+                Calibration
+              </button>
+              <button type="button" data-reason-preset="Power Flicker" class="reason-preset-chip px-2.5 py-1 rounded-lg text-[11px] font-medium bg-field hover:bg-slate-800 text-slate-300 hover:text-amber-300 border border-borderSubtle/80 transition-colors cursor-pointer">
+                Power Flicker
+              </button>
+            </div>
+          </div>
+
+          <!-- Footer Divider & Centered Label -->
+          <div class="mt-7 pt-4 border-t border-borderSubtle/70 text-center">
+            <p class="text-sm sm:text-[15px] font-semibold tracking-tight text-slate-400">
+              Production &amp; Downtime Log Entry
+            </p>
+          </div>
+        </form>
+
+        <!-- Google Form Auto-Submit Configuration Box -->
+        <div
+          id="googleFormConfigCard"
+          class="mt-4 bg-card border border-borderSubtle rounded-2xl p-4 sm:p-5 shadow-[0_16px_40px_-15px_rgba(0,0,0,0.65)]"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-borderSubtle/70">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex h-2 w-2 rounded-full bg-sky-400"></span>
+              <h3 class="text-xs sm:text-sm font-bold text-slate-100">
+                Google Form Auto-Input
+              </h3>
+            </div>
+            <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer select-none">
+              <input
+                id="gFormEnabledCheckbox"
+                type="checkbox"
+                class="rounded border-borderSubtle bg-field text-amber-500 focus:ring-amber-500/30 cursor-pointer"
+              />
+              <span>Auto-send on Save</span>
+            </label>
+          </div>
+
+          <div class="mt-3 space-y-3">
+            <div>
+              <label for="gFormResponseUrl" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                Google Form URL or /formResponse Action URL
+              </label>
+              <input
+                id="gFormResponseUrl"
+                type="url"
+                placeholder="https://docs.google.com/forms/d/e/.../formResponse"
+                autocomplete="off"
+                class="w-full bg-field border border-borderSubtle focus:border-amber-500 rounded-xl px-3 py-2 text-xs font-mono text-slate-100 placeholder:text-slate-500 outline-none"
+              />
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+              <div>
+                <label for="gFormEntryDate" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Date Entry ID
+                </label>
+                <input
+                  id="gFormEntryDate"
+                  type="text"
+                  placeholder="entry.111111111"
+                  autocomplete="off"
+                  class="w-full bg-field border border-borderSubtle focus:border-amber-500 rounded-xl px-2.5 py-2 text-xs font-mono text-slate-100 placeholder:text-slate-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label for="gFormEntryLine" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Line Entry ID
+                </label>
+                <input
+                  id="gFormEntryLine"
+                  type="text"
+                  placeholder="entry.222222222"
+                  autocomplete="off"
+                  class="w-full bg-field border border-borderSubtle focus:border-amber-500 rounded-xl px-2.5 py-2 text-xs font-mono text-slate-100 placeholder:text-slate-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label for="gFormEntryModel" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Model Entry ID
+                </label>
+                <input
+                  id="gFormEntryModel"
+                  type="text"
+                  placeholder="entry.333333333"
+                  autocomplete="off"
+                  class="w-full bg-field border border-borderSubtle focus:border-amber-500 rounded-xl px-2.5 py-2 text-xs font-mono text-slate-100 placeholder:text-slate-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label for="gFormEntryStart" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Start Entry ID
+                </label>
+                <input
+                  id="gFormEntryStart"
+                  type="text"
+                  placeholder="entry.444444444"
+                  autocomplete="off"
+                  class="w-full bg-field border border-borderSubtle focus:border-amber-500 rounded-xl px-2.5 py-2 text-xs font-mono text-slate-100 placeholder:text-slate-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label for="gFormEntryEnd" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  End Entry ID
+                </label>
+                <input
+                  id="gFormEntryEnd"
+                  type="text"
+                  placeholder="entry.555555555"
+                  autocomplete="off"
+                  class="w-full bg-field border border-borderSubtle focus:border-amber-500 rounded-xl px-2.5 py-2 text-xs font-mono text-slate-100 placeholder:text-slate-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label for="gFormEntryReason" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Reason Entry ID
+                </label>
+                <input
+                  id="gFormEntryReason"
+                  type="text"
+                  placeholder="entry.666666666"
+                  autocomplete="off"
+                  class="w-full bg-field border border-borderSubtle focus:border-amber-500 rounded-xl px-2.5 py-2 text-xs font-mono text-slate-100 placeholder:text-slate-500 outline-none"
+                />
+              </div>
+            </div>
+
+            <div class="pt-1 flex flex-wrap items-center justify-between gap-2">
+              <p id="gFormStatusText" class="text-[11px] text-slate-400">
+                Ready to auto-send when Save Record is clicked.
+              </p>
+              <button
+                id="saveGFormConfigBtn"
+                type="button"
+                class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-borderSubtle text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Save Form Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column on Tablet/PC: Quick Shift & Google Form Status Summary -->
+      <aside class="lg:col-span-5 xl:col-span-6 w-full space-y-4">
+        <div class="bg-card border border-borderSubtle rounded-2xl p-4 sm:p-5 shadow-[0_16px_40px_-15px_rgba(0,0,0,0.65)]">
+          <div class="flex items-center justify-between gap-2 pb-3 border-b border-borderSubtle/70">
+            <h3 class="text-xs sm:text-sm font-bold text-slate-100">
+              Multi-Device Workflow Tips
+            </h3>
+            <span class="text-[11px] font-mono text-amber-400">Responsive</span>
+          </div>
+          <ul class="mt-3 space-y-2 text-xs text-slate-400 leading-relaxed">
+            <li class="flex items-start gap-2">
+              <span class="text-amber-400 font-bold">&bull;</span>
+              <span><strong class="text-slate-200">Phone:</strong> Tap preset chips for Line, Model, or Reason Stop to log shifts fast with one hand.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-amber-400 font-bold">&bull;</span>
+              <span><strong class="text-slate-200">Tablet:</strong> Side-by-side entry and summary cards keep shift windows and Google Form status visible.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-amber-400 font-bold">&bull;</span>
+              <span><strong class="text-slate-200">PC:</strong> Filter logs, export CSV reports, or inspect/copy the Google Apps Script anytime.</span>
+            </li>
+          </ul>
+        </div>
+      </aside>
+
+      <!-- Saved Shift & Downtime Records Panel -->
+      <section
+        id="recordsPanel"
+        class="lg:col-span-12 bg-card border border-borderSubtle rounded-2xl p-5 sm:p-6 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.65)]"
+      >
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-borderSubtle/80">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold text-slate-100 flex items-center gap-2">
+              <span>Saved Shift &amp; Downtime Records</span>
+              <span id="filteredCountBadge" class="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                0 logs
+              </span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Stored locally in your browser. Filter by line or export to CSV.
+            </p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2.5">
+            <!-- Search Input -->
+            <div class="relative flex-1 sm:flex-initial">
+              <input
+                id="searchRecordsInput"
+                type="search"
+                placeholder="Search model, reason or date..."
+                class="w-full sm:w-52 bg-field border border-borderSubtle focus:border-amber-500 rounded-xl pl-3 pr-8 py-2 text-xs text-slate-100 placeholder:text-slate-500 outline-none"
+              />
+              <svg class="w-3.5 h-3.5 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8" />
+                <path stroke-linecap="round" d="M21 21l-4.35-4.35" />
+              </svg>
+            </div>
+
+            <!-- Filter by Line -->
+            <select
+              id="filterLineSelect"
+              aria-label="Filter records by line"
+              class="bg-field border border-borderSubtle focus:border-amber-500 rounded-xl px-3 py-2 text-xs font-semibold text-slate-200 outline-none cursor-pointer"
+            >
+              <option value="ALL">All Lines</option>
+            </select>
+
+            <!-- Export CSV -->
+            <button
+              id="exportCsvBtn"
+              type="button"
+              class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/35 transition-colors cursor-pointer"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              <span>Export CSV</span>
+            </button>
+
+            <!-- Clear All Records -->
+            <button
+              id="clearAllBtn"
+              type="button"
+              class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition-colors cursor-pointer"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <span>Clear All</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Records Table Wrapper -->
+        <div class="mt-4 overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-borderSubtle text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <th class="py-2.5 px-3">Date</th>
+                <th class="py-2.5 px-3">Line</th>
+                <th class="py-2.5 px-3">Model Name</th>
+                <th class="py-2.5 px-3">Time Start</th>
+                <th class="py-2.5 px-3">Time End</th>
+                <th class="py-2.5 px-3">Duration</th>
+                <th class="py-2.5 px-3">Reason Stop</th>
+                <th class="py-2.5 px-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="recordsTableBody" class="divide-y divide-borderSubtle/50"></tbody>
+          </table>
+
+          <div id="emptyRecordsState" class="hidden py-10 text-center">
+            <p class="text-sm font-medium text-slate-400">No shift or downtime records match your filter.</p>
+            <p class="text-xs text-slate-500 mt-1">Submit a Shift Log Entry above to record a new log.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Manage Master Lists Modal (Lines & Models) -->
+  <div
+    id="masterListsModal"
+    class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/75 backdrop-blur-xs"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="masterListsModalTitle"
+  >
+    <div class="w-full max-w-3xl bg-card border border-borderSubtle rounded-2xl p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between gap-3 pb-3 border-b border-borderSubtle">
+        <div>
+          <h3 id="masterListsModalTitle" class="text-base sm:text-lg font-bold text-slate-100">
+            Manage Master Lists — Lines &amp; Model Names
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">
+            Register new lines or models anytime. Custom entries persist in your browser.
+          </p>
+        </div>
+        <button
+          id="closeMasterListsBtn"
+          type="button"
+          aria-label="Close master lists modal"
+          class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Lines Manager -->
+        <div class="bg-field/70 border border-borderSubtle rounded-xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400">Production Lines</h4>
+            <span id="masterLineCount" class="text-[11px] font-mono text-slate-400">0</span>
+          </div>
+          <div class="flex gap-2 mb-3">
+            <input
+              id="masterNewLineInput"
+              type="text"
+              placeholder="New line name..."
+              class="flex-1 min-w-0 bg-card border border-borderSubtle focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 outline-none"
+            />
+            <button
+              id="masterAddLineBtn"
+              type="button"
+              class="px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shrink-0 cursor-pointer"
+            >
+              Add
+            </button>
+          </div>
+          <ul id="masterLinesList" class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+            <!-- Populated dynamically -->
+          </ul>
+        </div>
+
+        <!-- Model Names Manager -->
+        <div class="bg-field/70 border border-borderSubtle rounded-xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-sky-400">Model Names</h4>
+            <span id="masterModelCount" class="text-[11px] font-mono text-slate-400">0</span>
+          </div>
+          <div class="flex gap-2 mb-3">
+            <input
+              id="masterNewModelInput"
+              type="text"
+              placeholder="New model name..."
+              class="flex-1 min-w-0 bg-card border border-borderSubtle focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 outline-none"
+            />
+            <button
+              id="masterAddModelBtn"
+              type="button"
+              class="px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shrink-0 cursor-pointer"
+            >
+              Add
+            </button>
+          </div>
+          <ul id="masterModelsList" class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+            <!-- Populated dynamically -->
+          </ul>
+        </div>
+
+        <!-- Reason Stop Manager -->
+        <div class="bg-field/70 border border-borderSubtle rounded-xl p-4 md:col-span-2">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400">Reason Stop Presets</h4>
+            <span id="masterReasonCount" class="text-[11px] font-mono text-slate-400">0</span>
+          </div>
+          <div class="flex gap-2 mb-3">
+            <input
+              id="masterNewReasonInput"
+              type="text"
+              placeholder="New stop reason (e.g. Tool Wear / Air Pressure Drop)..."
+              class="flex-1 min-w-0 bg-card border border-borderSubtle focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 outline-none"
+            />
+            <button
+              id="masterAddReasonBtn"
+              type="button"
+              class="px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shrink-0 cursor-pointer"
+            >
+              Add
+            </button>
+          </div>
+          <ul id="masterReasonsList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5 max-h-48 overflow-y-auto pr-1">
+            <!-- Populated dynamically -->
+          </ul>
+        </div>
+      </div>
+
+      <div class="mt-5 pt-3 border-t border-borderSubtle flex items-center justify-between">
+        <button
+          id="resetMasterDefaultsBtn"
+          type="button"
+          class="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-borderSubtle transition-colors cursor-pointer"
+        >
+          Reset to Default Lists
+        </button>
+        <button
+          id="doneMasterListsBtn"
+          type="button"
+          class="px-4 py-2 rounded-xl text-xs font-bold bg-saveOrange hover:bg-saveOrangeHover text-white transition-colors cursor-pointer"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Google Apps Script Modal -->
+  <div
+    id="scriptModal"
+    class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/75 backdrop-blur-xs"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="scriptModalTitle"
+  >
+    <div class="w-full max-w-2xl bg-card border border-borderSubtle rounded-2xl p-5 sm:p-6 shadow-2xl">
+      <div class="flex items-center justify-between gap-3 pb-3 border-b border-borderSubtle">
+        <div>
+          <h3 id="scriptModalTitle" class="text-base font-bold text-slate-100">
+            Google Apps Script — Shift &amp; Downtime Logger
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">
+            Paste into Extensions &rarr; Apps Script on a Google Sheet to log entries via web app or menu.
+          </p>
+        </div>
+        <button
+          id="closeScriptModalBtn"
+          type="button"
+          aria-label="Close modal"
+          class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="mt-4 relative">
+        <button
+          id="copyAppsScriptBtn"
+          type="button"
+          class="absolute top-3 right-3 z-10 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors cursor-pointer"
+        >
+          <span id="copyScriptLabel">Copy Script</span>
+        </button>
+        <pre class="bg-canvas border border-borderSubtle rounded-xl p-4 pr-28 text-xs font-mono text-slate-200 overflow-x-auto max-h-80 leading-relaxed"><code id="appsScriptCode">const SHEET_NAME = 'ShiftDowntimeLog';
+
+/**
+ * Handles HTTP POST payloads from the Shift Log Entry app
+ * Expected JSON: { date, line, modelName, timeStart, timeEnd, durationMinutes, reasonStop }
+ */
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const sheet = getOrCreateLogSheet_();
+
+    const startMins = toMinutes_(data.timeStart);
+    const endMins = toMinutes_(data.timeEnd);
+    const computedDuration =
+      typeof data.durationMinutes === 'number'
+        ? data.durationMinutes
+        : ((endMins - startMins + 1440) % 1440);
+
+    sheet.appendRow([
+      new Date(),
+      data.date || '',
+      data.line || 'Line A',
+      data.modelName || 'Unspecified',
+      data.timeStart || '',
+      data.timeEnd || '',
+      (computedDuration / 60).toFixed(2),
+      data.reasonStop || 'None'
+    ]);
+
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'ok', message: 'Record logged' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'error', message: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function getOrCreateLogSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+    sheet.appendRow([
+      'Logged At', 'Date', 'Line', 'Model Name', 'Time Start', 'Time End', 'Duration (Hrs)', 'Reason Stop'
+    ]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function toMinutes_(hhmm) {
+  const [h, m] = String(hhmm || '00:00').split(':').map(Number);
+  return ((h || 0) * 60) + (m || 0);
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container (full width on small phones, anchored bottom-right on sm+) -->
+  <div
+    id="toastContainer"
+    class="fixed bottom-4 sm:bottom-5 left-0 right-0 sm:left-auto sm:right-5 z-50 flex flex-col gap-2 pointer-events-none sm:max-w-sm w-full px-3.5 sm:px-0"
+    aria-live="polite"
+  ></div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const STORAGE_KEY = 'shift_downtime_logs_v1';
+      const LINES_STORAGE_KEY = 'shift_master_lines_v1';
+      const MODELS_STORAGE_KEY = 'shift_master_models_v1';
+      const REASONS_STORAGE_KEY = 'shift_master_reasons_v1';
+      const GFORM_CONFIG_KEY = 'shift_gform_auto_config_v1';
+
+      const DEFAULT_LINES = [
+        'Line A', 'Line B', 'Line C', 'Line D', 'Line E', 'Line F', 'Line G',
+        'Line H', 'Line I', 'Line J', 'Line K', 'Line L', 'Line M', 'Line N',
+      ];
+
+      const DEFAULT_MODELS = [
+        'Triton-CONCH',
+        'SCALE',
+        'MEG',
+        'GILL',
+        'FAN motor',
+        'NISO',
+        'X12',
+      ];
+
+      const DEFAULT_REASONS = [
+        'Material Jam',
+        'Sensor Maintenance',
+        'Changeover',
+        'Calibration',
+        'Power Flicker',
+      ];
+
+      // DOM References
+      const form = document.getElementById('shiftLogForm');
+      const logDateInput = document.getElementById('logDate');
+      const logDateDisplay = document.getElementById('logDateDisplay');
+      const datePickerTrigger = document.getElementById('datePickerTrigger');
+      const dateError = document.getElementById('dateError');
+
+      const logLineSelect = document.getElementById('logLine');
+      const lineSelectWrapper = document.getElementById('lineSelectWrapper');
+      const newLineWrapper = document.getElementById('newLineWrapper');
+      const newLineInput = document.getElementById('newLineInput');
+      const toggleNewLineBtn = document.getElementById('toggleNewLineBtn');
+      const registerNewLineBtn = document.getElementById('registerNewLineBtn');
+      const cancelNewLineBtn = document.getElementById('cancelNewLineBtn');
+      const lineError = document.getElementById('lineError');
+
+      const timeStartInput = document.getElementById('timeStart');
+      const timeStartDisplay = document.getElementById('timeStartDisplay');
+      const timeStartTrigger = document.getElementById('timeStartTrigger');
+      const timeStartError = document.getElementById('timeStartError');
+
+      const timeEndInput = document.getElementById('timeEnd');
+      const timeEndDisplay = document.getElementById('timeEndDisplay');
+      const timeEndTrigger = document.getElementById('timeEndTrigger');
+      const timeEndError = document.getElementById('timeEndError');
+
+      const durationBadge = document.getElementById('durationBadge');
+      const overnightTag = document.getElementById('overnightTag');
+
+      const modelNameInput = document.getElementById('modelName');
+      const modelNameSelect = document.getElementById('modelNameSelect');
+      const modelNameSuggestions = document.getElementById('modelNameSuggestions');
+      const modelPresetChipsContainer = document.getElementById('modelPresetChipsContainer');
+      const toggleRegisterModelBtn = document.getElementById('toggleRegisterModelBtn');
+      const newModelWrapper = document.getElementById('newModelWrapper');
+      const newModelInput = document.getElementById('newModelInput');
+      const registerNewModelBtn = document.getElementById('registerNewModelBtn');
+      const cancelNewModelBtn = document.getElementById('cancelNewModelBtn');
+      const modelError = document.getElementById('modelError');
+
+      const reasonStopInput = document.getElementById('reasonStop');
+      const stopReasonSuggestions = document.getElementById('stopReasonSuggestions');
+      const reasonPresetChipsContainer = document.getElementById('reasonPresetChipsContainer');
+      const toggleRegisterReasonBtn = document.getElementById('toggleRegisterReasonBtn');
+      const newReasonWrapper = document.getElementById('newReasonWrapper');
+      const newReasonInput = document.getElementById('newReasonInput');
+      const registerNewReasonBtn = document.getElementById('registerNewReasonBtn');
+      const cancelNewReasonBtn = document.getElementById('cancelNewReasonBtn');
+      const reasonError = document.getElementById('reasonError');
+
+      const recordsPanel = document.getElementById('recordsPanel');
+      const toggleRecordsBtn = document.getElementById('toggleRecordsBtn');
+      const recordCountBadge = document.getElementById('recordCountBadge');
+      const filteredCountBadge = document.getElementById('filteredCountBadge');
+      const searchRecordsInput = document.getElementById('searchRecordsInput');
+      const filterLineSelect = document.getElementById('filterLineSelect');
+      const exportCsvBtn = document.getElementById('exportCsvBtn');
+      const clearAllBtn = document.getElementById('clearAllBtn');
+      const recordsTableBody = document.getElementById('recordsTableBody');
+      const emptyRecordsState = document.getElementById('emptyRecordsState');
+
+      const masterListsModal = document.getElementById('masterListsModal');
+      const openMasterListsBtn = document.getElementById('openMasterListsBtn');
+      const closeMasterListsBtn = document.getElementById('closeMasterListsBtn');
+      const doneMasterListsBtn = document.getElementById('doneMasterListsBtn');
+      const resetMasterDefaultsBtn = document.getElementById('resetMasterDefaultsBtn');
+      const masterNewLineInput = document.getElementById('masterNewLineInput');
+      const masterAddLineBtn = document.getElementById('masterAddLineBtn');
+      const masterLinesList = document.getElementById('masterLinesList');
+      const masterLineCount = document.getElementById('masterLineCount');
+      const masterNewModelInput = document.getElementById('masterNewModelInput');
+      const masterAddModelBtn = document.getElementById('masterAddModelBtn');
+      const masterModelsList = document.getElementById('masterModelsList');
+      const masterModelCount = document.getElementById('masterModelCount');
+      const masterNewReasonInput = document.getElementById('masterNewReasonInput');
+      const masterAddReasonBtn = document.getElementById('masterAddReasonBtn');
+      const masterReasonsList = document.getElementById('masterReasonsList');
+      const masterReasonCount = document.getElementById('masterReasonCount');
+
+      const scriptModal = document.getElementById('scriptModal');
+      const openScriptModalBtn = document.getElementById('openScriptModalBtn');
+      const closeScriptModalBtn = document.getElementById('closeScriptModalBtn');
+      const copyAppsScriptBtn = document.getElementById('copyAppsScriptBtn');
+      const copyScriptLabel = document.getElementById('copyScriptLabel');
+      const appsScriptCode = document.getElementById('appsScriptCode');
+
+      // Google Form Auto-Submit DOM References
+      const gFormEnabledCheckbox = document.getElementById('gFormEnabledCheckbox');
+      const gFormResponseUrlInput = document.getElementById('gFormResponseUrl');
+      const gFormEntryDateInput = document.getElementById('gFormEntryDate');
+      const gFormEntryLineInput = document.getElementById('gFormEntryLine');
+      const gFormEntryModelInput = document.getElementById('gFormEntryModel');
+      const gFormEntryStartInput = document.getElementById('gFormEntryStart');
+      const gFormEntryEndInput = document.getElementById('gFormEntryEnd');
+      const gFormEntryReasonInput = document.getElementById('gFormEntryReason');
+      const saveGFormConfigBtn = document.getElementById('saveGFormConfigBtn');
+      const gFormStatusText = document.getElementById('gFormStatusText');
+
+      const toastContainer = document.getElementById('toastContainer');
+
+      // Application State
+      let linesList = loadMasterList(LINES_STORAGE_KEY, DEFAULT_LINES);
+      let modelsList = loadMasterList(MODELS_STORAGE_KEY, DEFAULT_MODELS);
+      let reasonsList = loadMasterList(REASONS_STORAGE_KEY, DEFAULT_REASONS);
+      let gFormConfig = loadGFormConfig();
+      let records = loadRecords();
+
+      /**
+       * Load saved Google Form auto-submission settings from localStorage
+       */
+      function loadGFormConfig() {
+        const defaults = {
+          enabled: true,
+          formUrl:
+            'https://docs.google.com/forms/d/e/1FAIpQLSempmWQwa3y8vnVvQhrGbDANNsiXs7NQYaOR449YL1TAaNJMA/viewform?usp=pp_url',
+          entries: {
+            date: 'entry.1579373149',
+            line: 'entry.872976418',
+            modelName: 'entry.585899588',
+            timeStart: 'entry.405814912',
+            timeEnd: 'entry.1336825193',
+            reasonStop: 'entry.992996061',
+          },
+        };
+        try {
+          const raw = localStorage.getItem(GFORM_CONFIG_KEY);
+          if (!raw) return defaults;
+          const parsed = JSON.parse(raw);
+          return {
+            enabled: parsed.enabled !== undefined ? Boolean(parsed.enabled) : defaults.enabled,
+            formUrl: String(parsed.formUrl || defaults.formUrl).trim(),
+            entries: {
+              date: String(parsed.entries?.date || defaults.entries.date).trim(),
+              line: String(parsed.entries?.line || defaults.entries.line).trim(),
+              modelName: String(parsed.entries?.modelName || defaults.entries.modelName).trim(),
+              timeStart: String(parsed.entries?.timeStart || defaults.entries.timeStart).trim(),
+              timeEnd: String(parsed.entries?.timeEnd || defaults.entries.timeEnd).trim(),
+              reasonStop: String(parsed.entries?.reasonStop || defaults.entries.reasonStop).trim(),
+            },
+          };
+        } catch (err) {
+          console.error('Failed to load Google Form config:', err);
+          return defaults;
+        }
+      }
+
+      /**
+       * Sync Google Form configuration state into the UI inputs
+       */
+      function populateGFormInputs() {
+        gFormEnabledCheckbox.checked = gFormConfig.enabled;
+        gFormResponseUrlInput.value = gFormConfig.formUrl;
+        gFormEntryDateInput.value = gFormConfig.entries.date;
+        gFormEntryLineInput.value = gFormConfig.entries.line;
+        gFormEntryModelInput.value = gFormConfig.entries.modelName;
+        gFormEntryStartInput.value = gFormConfig.entries.timeStart;
+        gFormEntryEndInput.value = gFormConfig.entries.timeEnd;
+        gFormEntryReasonInput.value = gFormConfig.entries.reasonStop;
+      }
+
+      /**
+       * Read current values from the Google Form configuration inputs and save them
+       */
+      function saveGFormConfigFromInputs(notify = true) {
+        gFormConfig = {
+          enabled: gFormEnabledCheckbox.checked,
+          formUrl: gFormResponseUrlInput.value.trim(),
+          entries: {
+            date: normalizeEntryId(gFormEntryDateInput.value),
+            line: normalizeEntryId(gFormEntryLineInput.value),
+            modelName: normalizeEntryId(gFormEntryModelInput.value),
+            timeStart: normalizeEntryId(gFormEntryStartInput.value),
+            timeEnd: normalizeEntryId(gFormEntryEndInput.value),
+            reasonStop: normalizeEntryId(gFormEntryReasonInput.value),
+          },
+        };
+
+        gFormEntryDateInput.value = gFormConfig.entries.date;
+        gFormEntryLineInput.value = gFormConfig.entries.line;
+        gFormEntryModelInput.value = gFormConfig.entries.modelName;
+        gFormEntryStartInput.value = gFormConfig.entries.timeStart;
+        gFormEntryEndInput.value = gFormConfig.entries.timeEnd;
+        gFormEntryReasonInput.value = gFormConfig.entries.reasonStop;
+
+        try {
+          localStorage.setItem(GFORM_CONFIG_KEY, JSON.stringify(gFormConfig));
+          if (notify) {
+            showToast('Google Form auto-submit settings saved.', 'success');
+          }
+        } catch (err) {
+          console.error('Failed to save Google Form config:', err);
+          showToast('Could not save Google Form config.', 'error');
+        }
+      }
+
+      /**
+       * Normalize Google Form field name to `entry.<digits>` when numeric is entered
+       */
+      function normalizeEntryId(val) {
+        const trimmed = String(val || '').trim();
+        if (!trimmed) return '';
+        if (/^\d+$/.test(trimmed)) return `entry.${trimmed}`;
+        return trimmed;
+      }
+
+      /**
+       * Convert a standard Google Form edit/view URL into its `/formResponse` endpoint
+       */
+      function resolveGoogleFormResponseUrl(rawUrl) {
+        const clean = String(rawUrl || '').trim();
+        if (!clean) return null;
+        try {
+          const parsed = new URL(clean);
+          if (!/^https?:$/i.test(parsed.protocol)) return null;
+          let pathname = parsed.pathname;
+          if (/\/viewform\/?$/.test(pathname)) {
+            pathname = pathname.replace(/\/viewform\/?$/, '/formResponse');
+          } else if (/\/edit\/?$/.test(pathname)) {
+            pathname = pathname.replace(/\/edit\/?$/, '/formResponse');
+          } else if (!/\/formResponse\/?$/.test(pathname)) {
+            pathname = `${pathname.replace(/\/+$/, '')}/formResponse`;
+          }
+          parsed.pathname = pathname;
+          return parsed.toString();
+        } catch (err) {
+          return null;
+        }
+      }
+
+      /**
+       * Automatically submit a saved record to Google Forms using a hidden form + no-cors fetch/iframe fallback
+       */
+      async function autoSubmitToGoogleForm(record) {
+        if (!gFormConfig.enabled) return;
+
+        const endpoint = resolveGoogleFormResponseUrl(gFormConfig.formUrl);
+        if (!endpoint) {
+          gFormStatusText.textContent = 'Auto-send skipped: Invalid Google Form URL.';
+          gFormStatusText.className = 'text-[11px] text-rose-400';
+          showToast('Enter a valid Google Form URL for auto-input.', 'error');
+          return;
+        }
+
+        const params = new URLSearchParams();
+        const fieldMap = [
+          { key: gFormConfig.entries.date, value: record.dateDisplay || record.dateIso },
+          { key: gFormConfig.entries.line, value: record.line },
+          { key: gFormConfig.entries.modelName, value: record.modelName || '' },
+          { key: gFormConfig.entries.timeStart, value: record.timeStartDisplay },
+          { key: gFormConfig.entries.timeEnd, value: record.timeEndDisplay },
+          { key: gFormConfig.entries.reasonStop, value: record.reasonStop || '' },
+        ];
+
+        let mappedCount = 0;
+        for (const item of fieldMap) {
+          if (item.key) {
+            params.append(item.key, String(item.value ?? ''));
+            mappedCount += 1;
+          }
+        }
+
+        if (mappedCount === 0) {
+          gFormStatusText.textContent = 'Auto-send skipped: Add at least one entry.XXXX ID.';
+          gFormStatusText.className = 'text-[11px] text-amber-300';
+          showToast('Add at least one Google Form entry ID to auto-input.', 'info');
+          return;
+        }
+
+        try {
+          await fetch(endpoint, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            },
+            body: params.toString(),
+          });
+
+          const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          gFormStatusText.textContent = `Auto-sent ${mappedCount} field(s) to Google Form at ${nowTime}.`;
+          gFormStatusText.className = 'text-[11px] text-emerald-300';
+          showToast('Auto-submitted record to Google Form.', 'success');
+        } catch (err) {
+          console.error('Google Form auto-submit failed:', err);
+          gFormStatusText.textContent = 'Auto-send failed: Check form URL or network.';
+          gFormStatusText.className = 'text-[11px] text-rose-400';
+          showToast('Could not auto-send to Google Form.', 'error');
+        }
+      }
+
+      saveGFormConfigBtn.addEventListener('click', () => saveGFormConfigFromInputs(true));
+      gFormEnabledCheckbox.addEventListener('change', () => saveGFormConfigFromInputs(true));
+
+      /**
+       * Load master list (lines, models, or reasons) from localStorage with defaults
+       */
+      function loadMasterList(storageKey, fallbackDefaults) {
+        try {
+          const raw = localStorage.getItem(storageKey);
+          if (!raw) return [...fallbackDefaults];
+          const parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed) || parsed.length === 0) {
+            return [...fallbackDefaults];
+          }
+          return parsed.map((item) => String(item).trim()).filter(Boolean);
+        } catch (err) {
+          console.error('Failed to load master list:', err);
+          return [...fallbackDefaults];
+        }
+      }
+
+      /**
+       * Save master list to localStorage
+       */
+      function saveMasterList(storageKey, list) {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(list));
+        } catch (err) {
+          console.error('Failed to save master list:', err);
+        }
+      }
+
+      /**
+       * Register a new line if non-empty and not already present (case-insensitive)
+       */
+      function registerLineEntry(rawName) {
+        const cleaned = String(rawName || '').trim();
+        if (!cleaned) {
+          return { ok: false, message: 'Enter a line name first.' };
+        }
+        const existing = linesList.find((l) => l.toLowerCase() === cleaned.toLowerCase());
+        if (existing) {
+          logLineSelect.value = existing;
+          return { ok: true, value: existing, duplicate: true };
+        }
+        linesList.push(cleaned);
+        saveMasterList(LINES_STORAGE_KEY, linesList);
+        renderLineControls(cleaned);
+        renderMasterModalLists();
+        return { ok: true, value: cleaned, duplicate: false };
+      }
+
+      /**
+       * Register a new model name if non-empty and not already present (case-insensitive)
+       */
+      function registerModelEntry(rawName) {
+        const cleaned = String(rawName || '').trim();
+        if (!cleaned) {
+          return { ok: false, message: 'Enter a model name first.' };
+        }
+        const existing = modelsList.find((m) => m.toLowerCase() === cleaned.toLowerCase());
+        if (existing) {
+          modelNameInput.value = existing;
+          modelNameSelect.value = existing;
+          return { ok: true, value: existing, duplicate: true };
+        }
+        modelsList.push(cleaned);
+        saveMasterList(MODELS_STORAGE_KEY, modelsList);
+        renderModelControls(cleaned);
+        renderMasterModalLists();
+        return { ok: true, value: cleaned, duplicate: false };
+      }
+
+      /**
+       * Register a new stop reason if non-empty and not already present (case-insensitive)
+       */
+      function registerReasonEntry(rawName) {
+        const cleaned = String(rawName || '').trim();
+        if (!cleaned) {
+          return { ok: false, message: 'Enter a stop reason first.' };
+        }
+        const existing = reasonsList.find((r) => r.toLowerCase() === cleaned.toLowerCase());
+        if (existing) {
+          appendOrToggleReasonValue(existing, true);
+          return { ok: true, value: existing, duplicate: true };
+        }
+        reasonsList.push(cleaned);
+        saveMasterList(REASONS_STORAGE_KEY, reasonsList);
+        renderReasonControls();
+        appendOrToggleReasonValue(cleaned, true);
+        renderMasterModalLists();
+        return { ok: true, value: cleaned, duplicate: false };
+      }
+
+      /**
+       * Append or toggle a stop reason inside the REASON STOP input
+       */
+      function appendOrToggleReasonValue(preset, forceAdd = false) {
+        const current = reasonStopInput.value.trim();
+        if (!current) {
+          reasonStopInput.value = preset;
+          return;
+        }
+        const parts = current.split('/').map((s) => s.trim()).filter(Boolean);
+        const idx = parts.findIndex((p) => p.toLowerCase() === preset.toLowerCase());
+        if (idx >= 0) {
+          if (!forceAdd) {
+            parts.splice(idx, 1);
+          }
+        } else {
+          parts.push(preset);
+        }
+        reasonStopInput.value = parts.join(' / ');
+      }
+
+      /**
+       * Render Line dropdowns (form + filter)
+       */
+      function renderLineControls(selectedValue) {
+        const currentVal = selectedValue || logLineSelect.value || linesList[0] || 'Line A';
+        const currentFilter = filterLineSelect.value || 'ALL';
+
+        logLineSelect.innerHTML = linesList
+          .map((line) => `<option value="${escapeHtml(line)}">${escapeHtml(line)}</option>`)
+          .join('');
+
+        if (linesList.includes(currentVal)) {
+          logLineSelect.value = currentVal;
+        } else if (linesList.length > 0) {
+          logLineSelect.value = linesList[0];
+        }
+
+        filterLineSelect.innerHTML =
+          `<option value="ALL">All Lines</option>` +
+          linesList
+            .map((line) => `<option value="${escapeHtml(line)}">${escapeHtml(line)}</option>`)
+            .join('');
+        filterLineSelect.value =
+          currentFilter === 'ALL' || linesList.includes(currentFilter) ? currentFilter : 'ALL';
+      }
+
+      /**
+       * Render Reason Stop datalist and preset chips
+       */
+      function renderReasonControls() {
+        stopReasonSuggestions.innerHTML = reasonsList
+          .map((reason) => `<option value="${escapeHtml(reason)}"></option>`)
+          .join('');
+
+        reasonPresetChipsContainer.innerHTML = reasonsList
+          .map(
+            (reason) => `
+              <button
+                type="button"
+                data-reason-preset="${escapeHtml(reason)}"
+                class="reason-preset-chip px-2.5 py-1 rounded-lg text-[11px] font-medium bg-field hover:bg-slate-800 text-slate-300 hover:text-amber-300 border border-borderSubtle/80 transition-colors cursor-pointer"
+              >
+                ${escapeHtml(reason)}
+              </button>
+            `
+          )
+          .join('');
+      }
+
+      /**
+       * Render the lists inside the Manage Master Lists modal
+       */
+      function renderMasterModalLists() {
+        masterLineCount.textContent = String(linesList.length);
+        masterModelCount.textContent = String(modelsList.length);
+        masterReasonCount.textContent = String(reasonsList.length);
+
+        masterLinesList.innerHTML = linesList
+          .map(
+            (line) => `
+              <li class="flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-card border border-borderSubtle/70 text-xs">
+                <span class="font-medium text-slate-200 truncate">${escapeHtml(line)}</span>
+                <button
+                  type="button"
+                  data-remove-line="${escapeHtml(line)}"
+                  class="remove-line-btn text-slate-500 hover:text-rose-400 text-[11px] font-semibold px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                  title="Remove line"
+                >
+                  Remove
+                </button>
+              </li>
+            `
+          )
+          .join('');
+
+        masterModelsList.innerHTML = modelsList
+          .map(
+            (model) => `
+              <li class="flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-card border border-borderSubtle/70 text-xs">
+                <span class="font-mono font-medium text-sky-200 truncate">${escapeHtml(model)}</span>
+                <button
+                  type="button"
+                  data-remove-model="${escapeHtml(model)}"
+                  class="remove-model-btn text-slate-500 hover:text-rose-400 text-[11px] font-semibold px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                  title="Remove model"
+                >
+                  Remove
+                </button>
+              </li>
+            `
+          )
+          .join('');
+
+        masterReasonsList.innerHTML = reasonsList
+          .map(
+            (reason) => `
+              <li class="flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-card border border-borderSubtle/70 text-xs">
+                <span class="font-medium text-amber-200 truncate">${escapeHtml(reason)}</span>
+                <button
+                  type="button"
+                  data-remove-reason="${escapeHtml(reason)}"
+                  class="remove-reason-btn text-slate-500 hover:text-rose-400 text-[11px] font-semibold px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                  title="Remove stop reason"
+                >
+                  Remove
+                </button>
+              </li>
+            `
+          )
+          .join('');
+      }
+
+      /**
+       * Load records from localStorage safely
+       */
+      function loadRecords() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return [];
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (err) {
+          console.error('Failed to load records from localStorage:', err);
+          return [];
+        }
+      }
+
+      /**
+       * Save records to localStorage safely
+       */
+      function saveRecordsToStorage(list) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+        } catch (err) {
+          console.error('Failed to save records to localStorage:', err);
+          showToast('Could not write to browser storage.', 'error');
+        }
+      }
+
+      /**
+       * Show clean non-blocking toast notification
+       */
+      function showToast(message, type = 'success') {
+        const toast = document.createElement('div');
+        const styles =
+          type === 'success'
+            ? 'bg-cardElevated border-emerald-500/40 text-emerald-200'
+            : type === 'error'
+            ? 'bg-rose-950/95 border-rose-500/50 text-rose-200'
+            : 'bg-cardElevated border-amber-500/40 text-amber-200';
+
+        const iconPath =
+          type === 'success'
+            ? 'M5 13l4 4L19 7'
+            : type === 'error'
+            ? 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+            : 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z';
+
+        toast.className = `toast-anim pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-xl text-xs sm:text-sm font-medium ${styles}`;
+        toast.innerHTML = `
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="${iconPath}" />
+          </svg>
+          <span>${escapeHtml(message)}</span>
+        `;
+
+        toastContainer.appendChild(toast);
+
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(6px)';
+          toast.style.transition = 'all 0.2s ease';
+          setTimeout(() => toast.remove(), 220);
+        }, 2800);
+      }
+
+      /**
+       * Escape HTML entities to prevent XSS in dynamic table cells
+       */
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      /**
+       * Convert YYYY-MM-DD to MM/DD/YYYY
+       */
+      function isoToSlashDate(isoStr) {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(isoStr || '').trim());
+        if (!match) return '';
+        return `${match[2]}/${match[3]}/${match[1]}`;
+      }
+
+      /**
+       * Parse MM/DD/YYYY into YYYY-MM-DD (returns null if invalid)
+       */
+      function slashToIsoDate(slashStr) {
+        const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(slashStr || '').trim());
+        if (!match) return null;
+        const month = Number(match[1]);
+        const day = Number(match[2]);
+        const year = Number(match[3]);
+        if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1970 || year > 2100) {
+          return null;
+        }
+        const dateObj = new Date(Date.UTC(year, month - 1, day));
+        if (
+          dateObj.getUTCFullYear() !== year ||
+          dateObj.getUTCMonth() !== month - 1 ||
+          dateObj.getUTCDate() !== day
+        ) {
+          return null;
+        }
+        const mm = String(month).padStart(2, '0');
+        const dd = String(day).padStart(2, '0');
+        return `${year}-${mm}-${dd}`;
+      }
+
+      /**
+       * Convert 24h "HH:MM" into 12h "HH:MM AM/PM"
+       */
+      function hhmmTo12Hour(hhmm) {
+        const match = /^(\d{2}):(\d{2})$/.exec(String(hhmm || '').trim());
+        if (!match) return '08:00 AM';
+        let hours = Number(match[1]);
+        const minutes = match[2];
+        const period = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        if (hours === 0) hours = 12;
+        return `${String(hours).padStart(2, '0')}:${minutes} ${period}`;
+      }
+
+      /**
+       * Parse flexible 12h ("08:00 AM", "8pm") or 24h ("20:00", "8:30") into "HH:MM" (24h)
+       */
+      function parseFlexibleTimeTo24h(inputStr) {
+        const raw = String(inputStr || '').trim().toUpperCase();
+        if (!raw) return null;
+
+        // Match 12-hour with optional minutes and AM/PM
+        const ampmMatch = /^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/.exec(raw);
+        if (ampmMatch) {
+          let h = Number(ampmMatch[1]);
+          const m = ampmMatch[2] ? Number(ampmMatch[2]) : 0;
+          const period = ampmMatch[3];
+          if (h < 1 || h > 12 || m < 0 || m > 59) return null;
+          if (period === 'AM') {
+            h = h === 12 ? 0 : h;
+          } else {
+            h = h === 12 ? 12 : h + 12;
+          }
+          return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        }
+
+        // Match 24-hour HH:MM or H:MM
+        const h24Match = /^(\d{1,2}):(\d{2})$/.exec(raw);
+        if (h24Match) {
+          const h = Number(h24Match[1]);
+          const m = Number(h24Match[2]);
+          if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+          return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        }
+
+        return null;
+      }
+
+      /**
+       * Calculate shift/downtime duration in minutes between two HH:MM 24h strings
+       * Handles overnight shifts seamlessly (e.g. 22:00 to 06:00 => 480m)
+       */
+      function calculateDurationInfo(start24, end24) {
+        const sMatch = /^(\d{2}):(\d{2})$/.exec(start24 || '');
+        const eMatch = /^(\d{2}):(\d{2})$/.exec(end24 || '');
+        if (!sMatch || !eMatch) {
+          return { minutes: 0, label: '0h 00m', isOvernight: false };
+        }
+        const startTotal = Number(sMatch[1]) * 60 + Number(sMatch[2]);
+        const endTotal = Number(eMatch[1]) * 60 + Number(eMatch[2]);
+
+        let diff = endTotal - startTotal;
+        let isOvernight = false;
+
+        if (diff < 0) {
+          diff += 1440;
+          isOvernight = true;
+        }
+
+        const hours = Math.floor(diff / 60);
+        const mins = diff % 60;
+        return {
+          minutes: diff,
+          label: `${hours}h ${String(mins).padStart(2, '0')}m`,
+          isOvernight,
+        };
+      }
+
+      /**
+       * Update live duration indicator in the form
+       */
+      function updateDurationPreview() {
+        const info = calculateDurationInfo(timeStartInput.value, timeEndInput.value);
+        durationBadge.textContent = info.label;
+        if (info.isOvernight) {
+          overnightTag.classList.remove('hidden');
+        } else {
+          overnightTag.classList.add('hidden');
+        }
+      }
+
+      /**
+       * Toggle AM/PM on a 24h HH:MM value
+       */
+      function toggleAmPm(hhmm) {
+        const match = /^(\d{2}):(\d{2})$/.exec(hhmm || '08:00');
+        if (!match) return '08:00';
+        let h = Number(match[1]);
+        const m = match[2];
+        h = (h + 12) % 24;
+        return `${String(h).padStart(2, '0')}:${m}`;
+      }
+
+      /**
+       * Clear field error state
+       */
+      function clearFieldError(inputEl, errorEl) {
+        inputEl.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/20');
+        if (errorEl) {
+          errorEl.textContent = '';
+          errorEl.classList.add('hidden');
+        }
+      }
+
+      /**
+       * Set field error state
+       */
+      function setFieldError(inputEl, errorEl, message) {
+        inputEl.classList.add('border-rose-500', 'ring-2', 'ring-rose-500/20');
+        if (errorEl) {
+          errorEl.textContent = message;
+          errorEl.classList.remove('hidden');
+        }
+      }
+
+      // --- Date Sync & Calendar Trigger ---
+      datePickerTrigger.addEventListener('click', () => {
+        if (typeof logDateInput.showPicker === 'function') {
+          logDateInput.showPicker();
+        } else {
+          logDateInput.focus();
+          logDateInput.click();
+        }
+      });
+
+      logDateInput.addEventListener('change', () => {
+        if (logDateInput.value) {
+          logDateDisplay.value = isoToSlashDate(logDateInput.value);
+          clearFieldError(logDateDisplay, dateError);
+        }
+      });
+
+      logDateDisplay.addEventListener('blur', () => {
+        const iso = slashToIsoDate(logDateDisplay.value);
+        if (iso) {
+          logDateInput.value = iso;
+          logDateDisplay.value = isoToSlashDate(iso);
+          clearFieldError(logDateDisplay, dateError);
+        } else if (logDateDisplay.value.trim() !== '') {
+          setFieldError(logDateDisplay, dateError, 'Use MM/DD/YYYY format');
+        }
+      });
+
+      // --- Time Start Sync & Trigger ---
+      timeStartTrigger.addEventListener('click', (e) => {
+        if (e.shiftKey && typeof timeStartInput.showPicker === 'function') {
+          timeStartInput.showPicker();
+          return;
+        }
+        const toggled = toggleAmPm(timeStartInput.value);
+        timeStartInput.value = toggled;
+        timeStartDisplay.value = hhmmTo12Hour(toggled);
+        clearFieldError(timeStartDisplay, timeStartError);
+        updateDurationPreview();
+      });
+
+      timeStartInput.addEventListener('change', () => {
+        if (timeStartInput.value) {
+          timeStartDisplay.value = hhmmTo12Hour(timeStartInput.value);
+          clearFieldError(timeStartDisplay, timeStartError);
+          updateDurationPreview();
+        }
+      });
+
+      timeStartDisplay.addEventListener('blur', () => {
+        const parsed24 = parseFlexibleTimeTo24h(timeStartDisplay.value);
+        if (parsed24) {
+          timeStartInput.value = parsed24;
+          timeStartDisplay.value = hhmmTo12Hour(parsed24);
+          clearFieldError(timeStartDisplay, timeStartError);
+          updateDurationPreview();
+        } else {
+          setFieldError(timeStartDisplay, timeStartError, 'Enter valid time (e.g. 08:00 AM)');
+        }
+      });
+
+      // --- Time End Sync & Trigger ---
+      timeEndTrigger.addEventListener('click', (e) => {
+        if (e.shiftKey && typeof timeEndInput.showPicker === 'function') {
+          timeEndInput.showPicker();
+          return;
+        }
+        const toggled = toggleAmPm(timeEndInput.value);
+        timeEndInput.value = toggled;
+        timeEndDisplay.value = hhmmTo12Hour(toggled);
+        clearFieldError(timeEndDisplay, timeEndError);
+        updateDurationPreview();
+      });
+
+      timeEndInput.addEventListener('change', () => {
+        if (timeEndInput.value) {
+          timeEndDisplay.value = hhmmTo12Hour(timeEndInput.value);
+          clearFieldError(timeEndDisplay, timeEndError);
+          updateDurationPreview();
+        }
+      });
+
+      timeEndDisplay.addEventListener('blur', () => {
+        const parsed24 = parseFlexibleTimeTo24h(timeEndDisplay.value);
+        if (parsed24) {
+          timeEndInput.value = parsed24;
+          timeEndDisplay.value = hhmmTo12Hour(parsed24);
+          clearFieldError(timeEndDisplay, timeEndError);
+          updateDurationPreview();
+        } else {
+          setFieldError(timeEndDisplay, timeEndError, 'Enter valid time (e.g. 08:00 PM)');
+        }
+      });
+
+      /**
+       * Render Model Name dropdown, datalist suggestions, and quick-select chips
+       */
+      function renderModelControls(selectedValue) {
+        const currentVal = selectedValue !== undefined ? selectedValue : modelNameInput.value.trim();
+
+        modelNameSelect.innerHTML =
+          `<option value="">-- Preset Model --</option>` +
+          modelsList
+            .map((model) => `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`)
+            .join('');
+
+        modelNameSuggestions.innerHTML = modelsList
+          .map((model) => `<option value="${escapeHtml(model)}"></option>`)
+          .join('');
+
+        modelPresetChipsContainer.innerHTML = modelsList
+          .map(
+            (model) => `
+              <button
+                type="button"
+                data-model-preset="${escapeHtml(model)}"
+                class="model-preset-chip px-2.5 py-1 rounded-lg text-[11px] font-mono font-medium bg-field hover:bg-slate-800 text-sky-200 hover:text-amber-300 border border-borderSubtle/80 transition-colors cursor-pointer"
+              >
+                ${escapeHtml(model)}
+              </button>
+            `
+          )
+          .join('');
+
+        if (currentVal && modelsList.includes(currentVal)) {
+          modelNameSelect.value = currentVal;
+        } else {
+          modelNameSelect.value = '';
+        }
+      }
+
+      // --- Stop Reason Preset Chips & Inline Registration ---
+      reasonPresetChipsContainer.addEventListener('click', (e) => {
+        const chip = e.target.closest('.reason-preset-chip');
+        if (!chip) return;
+        const preset = chip.getAttribute('data-reason-preset') || '';
+        if (!preset) return;
+        appendOrToggleReasonValue(preset, false);
+        reasonStopInput.focus();
+      });
+
+      function showNewReasonBox(show) {
+        if (show) {
+          newReasonWrapper.classList.remove('hidden');
+          newReasonInput.value = reasonStopInput.value.trim();
+          clearFieldError(newReasonInput, reasonError);
+          newReasonInput.focus();
+        } else {
+          newReasonWrapper.classList.add('hidden');
+          clearFieldError(newReasonInput, reasonError);
+        }
+      }
+
+      toggleRegisterReasonBtn.addEventListener('click', () => {
+        const isHidden = newReasonWrapper.classList.contains('hidden');
+        showNewReasonBox(isHidden);
+      });
+
+      cancelNewReasonBtn.addEventListener('click', () => showNewReasonBox(false));
+
+      registerNewReasonBtn.addEventListener('click', () => {
+        const res = registerReasonEntry(newReasonInput.value);
+        if (!res.ok) {
+          setFieldError(newReasonInput, reasonError, res.message);
+          return;
+        }
+        showNewReasonBox(false);
+        showToast(
+          res.duplicate
+            ? `Applied existing reason "${res.value}".`
+            : `Registered new stop reason "${res.value}".`,
+          'success'
+        );
+      });
+
+      newReasonInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          registerNewReasonBtn.click();
+        }
+      });
+
+      // --- Inline New Line Registration ---
+      function showNewLineForm(show) {
+        if (show) {
+          lineSelectWrapper.classList.add('hidden');
+          newLineWrapper.classList.remove('hidden');
+          newLineInput.value = '';
+          clearFieldError(newLineInput, lineError);
+          newLineInput.focus();
+        } else {
+          newLineWrapper.classList.add('hidden');
+          lineSelectWrapper.classList.remove('hidden');
+          clearFieldError(newLineInput, lineError);
+        }
+      }
+
+      toggleNewLineBtn.addEventListener('click', () => showNewLineForm(true));
+      cancelNewLineBtn.addEventListener('click', () => showNewLineForm(false));
+
+      registerNewLineBtn.addEventListener('click', () => {
+        const res = registerLineEntry(newLineInput.value);
+        if (!res.ok) {
+          setFieldError(newLineInput, lineError, res.message);
+          return;
+        }
+        showNewLineForm(false);
+        showToast(
+          res.duplicate
+            ? `Selected existing line "${res.value}".`
+            : `Registered new line "${res.value}".`,
+          'success'
+        );
+      });
+
+      newLineInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          registerNewLineBtn.click();
+        }
+      });
+
+      // --- Model Name Selection, Presets & Inline Registration ---
+      modelNameSelect.addEventListener('change', () => {
+        if (modelNameSelect.value) {
+          modelNameInput.value = modelNameSelect.value;
+          modelNameInput.focus();
+        }
+      });
+
+      modelPresetChipsContainer.addEventListener('click', (e) => {
+        const chip = e.target.closest('.model-preset-chip');
+        if (!chip) return;
+        const preset = chip.getAttribute('data-model-preset') || '';
+        const current = modelNameInput.value.trim();
+
+        if (!current) {
+          modelNameInput.value = preset;
+        } else {
+          const parts = current.split('/').map((s) => s.trim()).filter(Boolean);
+          const idx = parts.findIndex((p) => p.toLowerCase() === preset.toLowerCase());
+          if (idx >= 0) {
+            parts.splice(idx, 1);
+          } else {
+            parts.push(preset);
+          }
+          modelNameInput.value = parts.join(' / ');
+        }
+        modelNameSelect.value = modelsList.includes(modelNameInput.value) ? modelNameInput.value : '';
+        modelNameInput.focus();
+      });
+
+      function showNewModelBox(show) {
+        if (show) {
+          newModelWrapper.classList.remove('hidden');
+          newModelInput.value = modelNameInput.value.trim();
+          clearFieldError(newModelInput, modelError);
+          newModelInput.focus();
+        } else {
+          newModelWrapper.classList.add('hidden');
+          clearFieldError(newModelInput, modelError);
+        }
+      }
+
+      toggleRegisterModelBtn.addEventListener('click', () => {
+        const isHidden = newModelWrapper.classList.contains('hidden');
+        showNewModelBox(isHidden);
+      });
+
+      cancelNewModelBtn.addEventListener('click', () => showNewModelBox(false));
+
+      registerNewModelBtn.addEventListener('click', () => {
+        const res = registerModelEntry(newModelInput.value);
+        if (!res.ok) {
+          setFieldError(newModelInput, modelError, res.message);
+          return;
+        }
+        showNewModelBox(false);
+        showToast(
+          res.duplicate
+            ? `Selected existing model "${res.value}".`
+            : `Registered new model "${res.value}".`,
+          'success'
+        );
+      });
+
+      newModelInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          registerNewModelBtn.click();
+        }
+      });
+
+      // --- Manage Master Lists Modal ---
+      function openMasterModal() {
+        renderMasterModalLists();
+        masterListsModal.classList.remove('hidden');
+        masterListsModal.classList.add('flex');
+      }
+
+      function closeMasterModal() {
+        masterListsModal.classList.add('hidden');
+        masterListsModal.classList.remove('flex');
+      }
+
+      openMasterListsBtn.addEventListener('click', openMasterModal);
+      closeMasterListsBtn.addEventListener('click', closeMasterModal);
+      doneMasterListsBtn.addEventListener('click', closeMasterModal);
+      masterListsModal.addEventListener('click', (e) => {
+        if (e.target === masterListsModal) closeMasterModal();
+      });
+
+      masterAddLineBtn.addEventListener('click', () => {
+        const res = registerLineEntry(masterNewLineInput.value);
+        if (!res.ok) {
+          showToast(res.message, 'error');
+          return;
+        }
+        masterNewLineInput.value = '';
+        showToast(
+          res.duplicate ? `Line "${res.value}" already registered.` : `Added line "${res.value}".`,
+          'success'
+        );
+      });
+
+      masterAddModelBtn.addEventListener('click', () => {
+        const res = registerModelEntry(masterNewModelInput.value);
+        if (!res.ok) {
+          showToast(res.message, 'error');
+          return;
+        }
+        masterNewModelInput.value = '';
+        showToast(
+          res.duplicate ? `Model "${res.value}" already registered.` : `Added model "${res.value}".`,
+          'success'
+        );
+      });
+
+      masterAddReasonBtn.addEventListener('click', () => {
+        const res = registerReasonEntry(masterNewReasonInput.value);
+        if (!res.ok) {
+          showToast(res.message, 'error');
+          return;
+        }
+        masterNewReasonInput.value = '';
+        showToast(
+          res.duplicate ? `Reason "${res.value}" already registered.` : `Added reason "${res.value}".`,
+          'success'
+        );
+      });
+
+      masterNewReasonInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          masterAddReasonBtn.click();
+        }
+      });
+
+      masterLinesList.addEventListener('click', (e) => {
+        const btn = e.target.closest('.remove-line-btn');
+        if (!btn) return;
+        const targetLine = btn.getAttribute('data-remove-line');
+        if (linesList.length <= 1) {
+          showToast('At least one line must remain.', 'error');
+          return;
+        }
+        linesList = linesList.filter((l) => l !== targetLine);
+        saveMasterList(LINES_STORAGE_KEY, linesList);
+        renderLineControls();
+        renderMasterModalLists();
+        showToast(`Removed line "${targetLine}".`, 'info');
+      });
+
+      masterModelsList.addEventListener('click', (e) => {
+        const btn = e.target.closest('.remove-model-btn');
+        if (!btn) return;
+        const targetModel = btn.getAttribute('data-remove-model');
+        modelsList = modelsList.filter((m) => m !== targetModel);
+        saveMasterList(MODELS_STORAGE_KEY, modelsList);
+        renderModelControls();
+        renderMasterModalLists();
+        showToast(`Removed model "${targetModel}".`, 'info');
+      });
+
+      masterReasonsList.addEventListener('click', (e) => {
+        const btn = e.target.closest('.remove-reason-btn');
+        if (!btn) return;
+        const targetReason = btn.getAttribute('data-remove-reason');
+        reasonsList = reasonsList.filter((r) => r !== targetReason);
+        saveMasterList(REASONS_STORAGE_KEY, reasonsList);
+        renderReasonControls();
+        renderMasterModalLists();
+        showToast(`Removed stop reason "${targetReason}".`, 'info');
+      });
+
+      resetMasterDefaultsBtn.addEventListener('click', () => {
+        linesList = [...DEFAULT_LINES];
+        modelsList = [...DEFAULT_MODELS];
+        reasonsList = [...DEFAULT_REASONS];
+        saveMasterList(LINES_STORAGE_KEY, linesList);
+        saveMasterList(MODELS_STORAGE_KEY, modelsList);
+        saveMasterList(REASONS_STORAGE_KEY, reasonsList);
+        renderLineControls('Line A');
+        renderModelControls('');
+        renderReasonControls();
+        renderMasterModalLists();
+        showToast('Reset lines, models, and stop reasons to defaults.', 'info');
+      });
+
+      // --- Form Validation & Submission ---
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+
+        let isValid = true;
+
+        // Validate Date
+        let isoDate = logDateInput.value;
+        const slashParsed = slashToIsoDate(logDateDisplay.value);
+        if (slashParsed) {
+          isoDate = slashParsed;
+          logDateInput.value = isoDate;
+          logDateDisplay.value = isoToSlashDate(isoDate);
+          clearFieldError(logDateDisplay, dateError);
+        } else if (!isoDate) {
+          setFieldError(logDateDisplay, dateError, 'Please enter a valid date (MM/DD/YYYY)');
+          isValid = false;
+        } else {
+          clearFieldError(logDateDisplay, dateError);
+        }
+
+        // Validate Time Start
+        const start24 = parseFlexibleTimeTo24h(timeStartDisplay.value) || timeStartInput.value;
+        if (!start24) {
+          setFieldError(timeStartDisplay, timeStartError, 'Invalid start time');
+          isValid = false;
+        } else {
+          timeStartInput.value = start24;
+          timeStartDisplay.value = hhmmTo12Hour(start24);
+          clearFieldError(timeStartDisplay, timeStartError);
+        }
+
+        // Validate Time End
+        const end24 = parseFlexibleTimeTo24h(timeEndDisplay.value) || timeEndInput.value;
+        if (!end24) {
+          setFieldError(timeEndDisplay, timeEndError, 'Invalid end time');
+          isValid = false;
+        } else {
+          timeEndInput.value = end24;
+          timeEndDisplay.value = hhmmTo12Hour(end24);
+          clearFieldError(timeEndDisplay, timeEndError);
+        }
+
+        if (!isValid) {
+          showToast('Please check the highlighted shift fields.', 'error');
+          return;
+        }
+
+        const durationInfo = calculateDurationInfo(start24, end24);
+        const newRecord = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          dateIso: isoDate,
+          dateDisplay: isoToSlashDate(isoDate),
+          line: logLineSelect.value,
+          modelName: modelNameInput.value.trim(),
+          timeStart24: start24,
+          timeStartDisplay: hhmmTo12Hour(start24),
+          timeEnd24: end24,
+          timeEndDisplay: hhmmTo12Hour(end24),
+          durationMinutes: durationInfo.minutes,
+          durationLabel: durationInfo.label,
+          isOvernight: durationInfo.isOvernight,
+          reasonStop: reasonStopInput.value.trim(),
+          createdAt: new Date().toISOString(),
+        };
+
+        records.unshift(newRecord);
+        saveRecordsToStorage(records);
+        renderRecords();
+        autoSubmitToGoogleForm(newRecord);
+
+        // Clear stop reason and model name after saving so rapid consecutive entries stay smooth
+        reasonStopInput.value = '';
+        modelNameInput.value = '';
+        modelNameSelect.value = '';
+        showToast(`Saved ${newRecord.line} log (${newRecord.dateDisplay})`, 'success');
+      });
+
+      // --- Render Filtered Records Table ---
+      function getFilteredRecords() {
+        const lineFilter = filterLineSelect.value;
+        const query = searchRecordsInput.value.trim().toLowerCase();
+
+        return records.filter((rec) => {
+          const matchesLine = lineFilter === 'ALL' || rec.line === lineFilter;
+          const matchesQuery =
+            !query ||
+            (rec.modelName && rec.modelName.toLowerCase().includes(query)) ||
+            (rec.reasonStop && rec.reasonStop.toLowerCase().includes(query)) ||
+            (rec.dateDisplay && rec.dateDisplay.toLowerCase().includes(query)) ||
+            (rec.line && rec.line.toLowerCase().includes(query));
+          return matchesLine && matchesQuery;
+        });
+      }
+
+      function renderRecords() {
+        recordCountBadge.textContent = String(records.length);
+        const filtered = getFilteredRecords();
+        filteredCountBadge.textContent = `${filtered.length} ${filtered.length === 1 ? 'log' : 'logs'}`;
+
+        if (filtered.length === 0) {
+          recordsTableBody.innerHTML = '';
+          emptyRecordsState.classList.remove('hidden');
+          return;
+        }
+
+        emptyRecordsState.classList.add('hidden');
+        recordsTableBody.innerHTML = filtered
+          .map((rec) => {
+            const modelBadge = rec.modelName
+              ? `<span class="inline-block px-2.5 py-1 rounded-lg text-xs font-mono font-medium bg-slate-800/80 text-sky-200 border border-slate-700/70">${escapeHtml(rec.modelName)}</span>`
+              : `<span class="text-xs text-slate-500 italic">—</span>`;
+
+            const reasonBadge = rec.reasonStop
+              ? `<span class="inline-block px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-200 border border-amber-500/25">${escapeHtml(rec.reasonStop)}</span>`
+              : `<span class="text-xs text-slate-500 italic">No stop logged</span>`;
+
+            const overnightPill = rec.isOvernight
+              ? `<span class="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">+1d</span>`
+              : '';
+
+            return `
+              <tr class="hover:bg-cardElevated/50 transition-colors">
+                <td class="py-3 px-3 font-mono text-xs sm:text-sm font-semibold text-slate-200 tabular-nums whitespace-nowrap">
+                  ${escapeHtml(rec.dateDisplay)}
+                </td>
+                <td class="py-3 px-3 whitespace-nowrap">
+                  <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-800/90 text-slate-100 border border-slate-700/70">
+                    ${escapeHtml(rec.line)}
+                  </span>
+                </td>
+                <td class="py-3 px-3 whitespace-nowrap">
+                  ${modelBadge}
+                </td>
+                <td class="py-3 px-3 font-mono text-xs sm:text-sm text-slate-300 tabular-nums whitespace-nowrap">
+                  ${escapeHtml(rec.timeStartDisplay)}
+                </td>
+                <td class="py-3 px-3 font-mono text-xs sm:text-sm text-slate-300 tabular-nums whitespace-nowrap">
+                  ${escapeHtml(rec.timeEndDisplay)}${overnightPill}
+                </td>
+                <td class="py-3 px-3 font-mono text-xs font-semibold text-amber-300 tabular-nums whitespace-nowrap">
+                  ${escapeHtml(rec.durationLabel)}
+                </td>
+                <td class="py-3 px-3 min-w-[180px]">
+                  ${reasonBadge}
+                </td>
+                <td class="py-3 px-3 text-right whitespace-nowrap">
+                  <button
+                    type="button"
+                    data-delete-id="${escapeHtml(rec.id)}"
+                    class="delete-record-btn inline-flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/50 transition-colors cursor-pointer"
+                    title="Delete record"
+                    aria-label="Delete record"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+            `;
+          })
+          .join('');
+      }
+
+      // Delete individual record via event delegation
+      recordsTableBody.addEventListener('click', (e) => {
+        const btn = e.target.closest('.delete-record-btn');
+        if (!btn) return;
+        const id = btn.getAttribute('data-delete-id');
+        records = records.filter((r) => r.id !== id);
+        saveRecordsToStorage(records);
+        renderRecords();
+        showToast('Record removed.', 'info');
+      });
+
+      // Filter & Search listeners
+      filterLineSelect.addEventListener('change', renderRecords);
+      searchRecordsInput.addEventListener('input', renderRecords);
+
+      // Toggle records panel visibility
+      toggleRecordsBtn.addEventListener('click', () => {
+        recordsPanel.classList.toggle('hidden');
+        if (!recordsPanel.classList.contains('hidden')) {
+          recordsPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      });
+
+      // Clear all records
+      clearAllBtn.addEventListener('click', () => {
+        if (records.length === 0) {
+          showToast('No records to clear.', 'info');
+          return;
+        }
+        records = [];
+        saveRecordsToStorage(records);
+        renderRecords();
+        showToast('All saved records cleared.', 'info');
+      });
+
+      // Export filtered records to CSV
+      exportCsvBtn.addEventListener('click', () => {
+        const rowsToExport = getFilteredRecords();
+        if (rowsToExport.length === 0) {
+          showToast('No records available to export.', 'error');
+          return;
+        }
+
+        const headers = [
+          'Date',
+          'Line',
+          'Model Name',
+          'Time Start',
+          'Time End',
+          'Duration',
+          'Duration (Minutes)',
+          'Reason Stop',
+        ];
+
+        const csvEscape = (val) => {
+          const str = String(val ?? '');
+          if (/[",\n\r]/.test(str)) {
+            return `"${str.replace(/"/g, '""')}"`;
+          }
+          return str;
+        };
+
+        const csvLines = [
+          headers.map(csvEscape).join(','),
+          ...rowsToExport.map((r) =>
+            [
+              r.dateDisplay,
+              r.line,
+              r.modelName || '',
+              r.timeStartDisplay,
+              r.timeEndDisplay,
+              r.durationLabel,
+              r.durationMinutes,
+              r.reasonStop || '',
+            ]
+              .map(csvEscape)
+              .join(',')
+          ),
+        ];
+
+        const blob = new Blob([csvLines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `shift-downtime-log-${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        showToast(`Exported ${rowsToExport.length} record(s) to CSV.`, 'success');
+      });
+
+      // --- Google Apps Script Modal ---
+      openScriptModalBtn.addEventListener('click', () => {
+        scriptModal.classList.remove('hidden');
+        scriptModal.classList.add('flex');
+      });
+
+      function closeScriptModal() {
+        scriptModal.classList.add('hidden');
+        scriptModal.classList.remove('flex');
+      }
+
+      closeScriptModalBtn.addEventListener('click', closeScriptModal);
+      scriptModal.addEventListener('click', (e) => {
+        if (e.target === scriptModal) closeScriptModal();
+      });
+
+      copyAppsScriptBtn.addEventListener('click', () => {
+        const text = appsScriptCode.textContent || '';
+        const helper = document.createElement('textarea');
+        helper.value = text;
+        helper.setAttribute('readonly', '');
+        helper.style.position = 'absolute';
+        helper.style.left = '-9999px';
+        document.body.appendChild(helper);
+        helper.select();
+        let copied = false;
+        try {
+          copied = document.execCommand('copy');
+        } catch (err) {
+          copied = false;
+        }
+        document.body.removeChild(helper);
+
+        if (copied) {
+          copyScriptLabel.textContent = 'Copied!';
+          showToast('Google Apps Script copied to clipboard.', 'success');
+          setTimeout(() => {
+            copyScriptLabel.textContent = 'Copy Script';
+          }, 1800);
+        } else {
+          showToast('Select and copy the script text manually.', 'info');
+        }
+      });
+
+      // Initial Setup
+      populateGFormInputs();
+      renderLineControls('Line A');
+      renderModelControls('');
+      renderReasonControls();
+      logDateDisplay.value = isoToSlashDate(logDateInput.value);
+      timeStartDisplay.value = hhmmTo12Hour(timeStartInput.value);
+      timeEndDisplay.value = hhmmTo12Hour(timeEndInput.value);
+      updateDurationPreview();
+      renderRecords();
+    })();
+  </script>
+</body>
+</html>
